@@ -1,3 +1,16 @@
+%% Code to call function:
+E = 200 * 1e9;
+nu = 0.3;
+t = 5/1000;
+
+node1 = [0 0];
+node2 = [1 0];
+node3 = [1 1];
+
+Ke = cst(node1, node2, node3, E, nu, t)
+
+%% Code:
+
 function Ke = cst(node1, node2, node3, E, nu, t)
 
 x1 = node1(1); y1 = node1(2);
