@@ -1,0 +1,39 @@
+function vbm = response_time_history(tim,wav,w,vbm_tf)
+wave = fft(wav);
+
+[a,b] = size(tim);
+Tmax = tim(end);
+
+k = 1:1:b;
+wk = (k-ones(1,b)).*((2*pi)/Tmax);
+
+vbm_tf_new = zeros(1,b);
+
+for i = 1:b
+    if wk(i) < w(1) | wk(i) > w(end)
+        vbm_tf_new(i) = 0;
+    elseif wk(i) == w(1)
+        vbm_tf_new(i) = vbm_tf(1);
+    elseif wk(i) == w(end)
+        vbm_tf_new(i) = vbm_tf(end);
+    else
+        ind1 = find(w<wk(i));
+        ind1 = ind1(end);
+        
+        ind2 = find(w>wk(i));
+        ind2 = ind2(1);
+        
+        vbm_tf_new(i) = (wk(i) - w(ind1))*(vbm_tf(ind2) - vbm_tf(ind1))/(w(ind2) - w(ind1)) + vbm_tf(ind1);
+    end
+end
+
+VBM = wave.*vbm_tf_new;
+
+
+j = 1;
+for i=(1+b)/2+1:b
+    VBM(i) = conj( VBM((end+1)/2-j) );    
+    j = j+1;
+end
+
+vbm = ifft(VBM,'symmetric');
