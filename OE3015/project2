@@ -1,0 +1,185 @@
+function body = calculate_RAO(body)
+
+% Constants
+
+rho = body.rho;
+g = body.g;
+
+% Required inputs
+
+xbody = body.xbody;
+xprdct = body.xprdct; kyy = xprdct(2,2);    % Pitch radius of gyration
+w = body.w;
+bet = body.dir * pi / 180;
+
+zeta = body.zeta;
+
+pan_cen = body.cen;
+pan_area = body.area;
+pan_nx = body.nor(:,1);
+pan_nz = body.nor(:,3);
+
+xB = body.cob(1);
+xG = xB;
+
+% Global coordinates of the panel centroids
+
+X = pan_cen(:,1) + xbody(1);
+Y = pan_cen(:,2) + xbody(2);
+Z = pan_cen(:,3) + xbody(3);
+
+% Wave number
+
+k = w.^2/g;
+
+F3 = zeros(1,numel(w));
+F5 = zeros(1,numel(w));
+xi = zeros(2,numel(w));
+
+
+% Your code here
+%--------------------------------------------------------------------
+m = zeros(2,2);
+m(1,1)= -rho*sum(pan_area(:,1).*pan_nz(:,1).*Z(:,1));
+m(2,1)= rho*sum(pan_area(:,1).*pan_nz(:,1).*Z(:,1).*pan_cen(:,1));
+m(1,2) = m(2,1);
+m(2,2) = -rho*sum(pan_area(:,1).*pan_nz(:,1).*Z(:,1).*(kyy^2));
+
+c = zeros(2,2);
+c(1,1) = rho*g*sum(pan_area(:,1).*pan_nz(:,1));
+c(2,1) = (-1)*rho*g*sum(pan_area(:,1).*pan_nz(:,1).*pan_cen(:,1));
+c(1,2) = c(2,1);
+c(2,2) = rho*g*sum(pan_area(:,1).*pan_nz(:,1).*pan_cen(:,1).*pan_cen(:,1));
+
+b = eye(2,2);
+b(1,1) = 2*zeta*sqrt(m(1,1)*c(1,1));
+b(2,2) = 2*zeta*sqrt(m(2,2)*c(2,2));
+
+for j=1:numel(k)
+    F3(1,j)=rho*g*sum(pan_area.*pan_nz.*exp(k(j).*Z(:,1)).*exp(-1i*(k(j).*X(:,1).*cos(bet) + k(j).*Y(:,1).*sin(bet))));
+    F5(1,j)=rho*g*sum(pan_area.*((pan_cen(:,3).*pan_nx(:,1)) - (pan_cen(:,1).*pan_nz(:,1))).*exp(k(j).*Z).*exp(-(1i.*k(j).*X.*cos(bet) + 1i.*k(j).*Y.*sin(bet))));
+end
+
+F=[F3;F5];
+
+
+xi3 = zeros(1,numel(w));
+xi5 = zeros(1,numel(w));
+xi = [xi3; xi5];
+
+for j=1:numel(w)
+    xi(:,j)=inv(-(m*w(j)^(2)) + (b*1i*w(j)) + c)*F(:,j);
+end
+
+
+
+
+
+%--------------------------------------------------------------------
+
+% Export outputs
+
+body.xi3 = xi(1,:);
+body.xi5 = xi(2,:);
+
+function VBM = calculate_vbm_wave(body)
+
+% Constants
+
+rho = body.rho;
+g = body.g;
+
+% Required Inputs
+
+xbody = body.xbody;
+xprdct = body.xprdct;
+xdist = body.xdist;
+zeta = body.zeta;
+
+pan_cen = body.cen;
+pan_area = body.area;
+pan_nx = body.nor(:,1);
+pan_nz = body.nor(:,3);
+
+w = body.w;
+xi3 = body.xi3;
+xi5 = body.xi5;
+bet = body.dir * pi / 180;
+
+% Global coordinates of the panel centroids
+
+X = pan_cen(:,1) + xbody(1);
+Y = pan_cen(:,2) + xbody(2);
+Z = pan_cen(:,3) + xbody(3);
+
+% Waterplane area
+
+awp = sum(pan_area .* pan_nz);
+
+% Wave number
+
+k = w.^2/g;
+
+% Longitudinal spacing at which VBM is evaluated
+
+dxdist = mean(diff(xdist));
+
+% Pitch radius of gyration
+
+kyy = xprdct(2,2);
+
+VBM = zeros(numel(w),numel(xdist));
+
+% Your code here
+%--------------------------------------------------------------------
+
+m = zeros(numel(w),numel(xdist));
+
+alpha = ones(size(xdist));
+alpha(1) = 2;
+alpha(numel(xdist)) = 2;
+
+m55 = 0;
+c55 = 0;
+
+for t = 1:numel(X)
+    m55 = m55 + pan_area(t,1)*Z(t)*(-rho)*pan_nz(t)*(kyy^2);
+    c55 = c55 + rho*g*pan_nz(t)*pan_area(t,1)*(X(t)^2);
+end
+
+b55 = 0.6*sqrt(m55*c55);
+
+for u=1:numel(w)
+    for t=1:numel(xdist)
+        for j=1:size(X)
+            if X(j,1) >= (xdist(1,t) - (dxdist/2)) && X(j,1) < (xdist(1,t) + (dxdist/2))
+                pk = rho*g*exp(k(1,u)*Z(j))*exp(-1i*k(1,u)*(X(j)*cos(bet) + Y(j)*sin(bet)));
+                c55_n = rho*g*(X(j)^2);
+                m55_n = -rho*Z(j)*(kyy^2);
+                m(u,t) = m(u,t) + (alpha(t)/dxdist)*((pan_area(j,1))*pk*((Z(j) - xbody(3))*pan_nx(j) - X(j)*pan_nz(j)) - (pan_area(j,1)*pan_nz(j)*(c55_n - (w(1,u)^2)*m55_n + 1i*w(1,u)*b55/awp)*xi5(u)) - (pan_area(j,1)*pan_nz(j)*(-rho*g*X(j))*xi3(u)));
+            end
+        end
+    end
+end
+
+for u=1:numel(w)
+    VBM(u,:)=-cumtrapz(xdist,m(u,:));
+end
+
+
+%--------------------------------------------------------------------
+
+body.VBM = VBM;
+
+function S = wave_spectrum(w,Hs,Tp)
+
+g = 9.80665;
+
+for j=2:numel(w)
+    S(j)=(0.3125*Tp*Hs^(2)*((w(j)*Tp/(2*pi))^(-5))*exp(-(5*(w(j)*Tp/(2*pi))^(-4))/4))/(2*pi) ;
+end
+
+function Sr = response_spectrum(S,vbm_tf)
+
+
+Sr = abs(vbm_tf).*abs(vbm_tf).*S;
