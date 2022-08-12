@@ -40,7 +40,8 @@ while true
     % Write the code in the space below to compute the matrix A and b
     %----------------------------------------------------------------------
     t1 = xn(1); h1 = xn(2);   
-    
+    A = [-sqrt(K1*E),0; -sqrt(K2*E),sqrt(sigma_c*gamma0); (-K3*E*h1),(-K3*E*t1)];
+    b = [sqrt(sigma_c*gamma0)*(-b_s); 0; -(K3*E*h1*t1)-(gamma0*(b_s^2)*sigma_c)]; 
     
     %----------------------------------------------------------------------
     
